@@ -22,7 +22,9 @@ ss_out.sdat.set_elem_to_type(mmps.get_elem_to_type("para.rd"))
 #define output cell size
 ss_out.sdat.set_cellsize([[0, 300], [0, 300], [0, 300]])
 
+new_center = [150,150,150]
 #define pos_shift list
+
 
 def g_c(atoms : mmps.Stream().sdat.particles):
     x, y, z = np.hsplit(atoms['pos'],3)
@@ -31,10 +33,11 @@ def g_c(atoms : mmps.Stream().sdat.particles):
 cent = g_c(ss1.sdat.particles)
 #print(cent[0] ,cent[1], cent[2])
 #print(cent)
-
+shift_pos = new_center - cent
+ss1.sdat.shift_particles(shift_pos)
 ss_out.sdat.concate_particles(ss1.sdat.particles)
 #flag = (ss2.sdat.particles['pos'][0] - cent[0])**2 +(ss2.sdat.particles['pos'][1] - cent[1])**2 +(ss2.sdat.particles['pos'][2] - cent[2])**2 < 10000
-dist = (ss2.sdat.particles['pos'] - cent)**2
+dist = (ss2.sdat.particles['pos'] - new_center)**2
 #同じ行のものを足す
 distarr=np.sum(dist, axis=1)
 flag = (distarr>10000) & (distarr<22500)
