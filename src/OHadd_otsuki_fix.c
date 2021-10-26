@@ -405,7 +405,7 @@ void surfacearea (int option[ATOM][2], double arr[ATOM][6]) {
     				a=nn[0]+nn[1]*grid[0]+nn[2]*grid[0]*grid[1];
 			        flag +=1 ;
                 }
-			if (prop[a]<rcut && flag == 6) option[i][1]=10;
+			if (prop[a]<rcut && flag == particle_num) option[i][1]=10;
             }
 		}
 	}
