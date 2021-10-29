@@ -30,27 +30,38 @@ import numpy as np
 import sys
 import copy
 import math
+CB_num = 2
 
 ss=mmps.Stream()
 
 ss.import_file('ptoncb.rd','input')
-ss.import_file('dump.bond.20000','dumpbond')
+ss.import_file('dump.bond.0','dumpbond')
 
 def g_c(atoms : mmps.Stream().sdat.particles):
     x, y, z = np.hsplit(atoms['pos'],3)
-    center = np.array([x.mean(), y.mean(), z.mean()])
+    center = [x.mean(), y.mean(), z.mean()]
     return center
 
+def g_c_by_mol(atoms : mmps.Stream().sdat.particles, mol):
+    flag = atoms["mol"] == mol
+    x, y, z = np.hsplit(atoms['pos'][flag],3)
+    center = [x.mean(), y.mean(), z.mean()]
+    return center
+
+#atom1 should be larger one
 def get_between_dis(atom1, atom2):
+#    for i in atom2
     dis = (atom1 - atom2)**2
-    disarr = np.sum(dis)
+    disarr = np.sum(dis,axis = 1)
     return disarr
+
 # get center
 dcell=ss.sdat.cell[2]
 pos_shift = [0, 0, -dcell]
 #print(pos_shift)
+CB_list=[i+1 for i in range(CB_num)]
 CB_G = np.empty((0,3))
-for mask in range(1,7):
+for mask in CB_list:
     CB = copy.deepcopy(ss.sdat)
     CB.trimming_particles(CB.particles['mask']==mask)
     #print(f'CB position {CB.particles["pos"]}')
@@ -67,61 +78,97 @@ for mask in range(1,7):
 
     CB_pos = CB.particles
     #print(f'center{CB_pos}')
-    CB_g = g_c(CB_pos)
-    #print(CB_g)
-    CB_G = np.append(CB_G, [CB_g], axis=0)
+    CB_g = [g_c(CB_pos)]
+    CB_G = np.append(CB_G, CB_g, axis=0)
 
-    #calc each CB distance in 2 dim list
+print("CB_G")
+print(CB_G)
 
 
-for x in CB_G:
-    for y in CB_G:
-        CB_Gpos = get_between_dis(x, y)
-        #print(f'CB gravity center position{CB_Gpos}')
-
+#for x in CB_G:
+#    CB_Gpos = [get_between_dis(x, CB_G)]
+#print(CB_Gpos)
 
 #get each Ptcluster gravity center
 Pt=copy.deepcopy(ss.sdat)
-print(Pt.bondorder_list)
-flag = Pt.particles['type']==4
-print(flag)
-Pt.trimming_particles(flag)
+#print(Pt.bondorder_list)
+#print(flag)
 Pt.create_connect_list(0.3)
-print(Pt.connect_list)
+#print(Pt.connect_list)
 
 c_list = Pt.connect_list
 m_list = topology.create_molecule(Pt)
-
-
+#print(m_list)
+#flag = Pt.particles['type']==4
+#Pt.trimming_particles(flag,True)
 
 '''
-ss.sdat.add_particles_property("molnum", _dtype = int, dim =1)
+Pt.add_particles_property("molnum", _dtype = int, dim =1)
 for l in m_list:
     #get center
     num_mol = len(l)
     for ind in l:
-        ss.sdat.particles["molnum"][ind]=num_mol
-    print(ss.sdat.particles["molnum"])
-    flag = Pt.particles['mol'] == l
-    Pt.trimming_particles[flag]
-    Pt_G = g_c(Pt.particles)
-    #get closest & 2nd closest dis from center
-    """
-    Pt.add_particles_property("close_dis")
-    Pt.add_particles_property("close_mask")
-    Pt.add_particles_property("2nd_close_dis")
-    Pt.add_particles_property("2nd_close_mask")
-    """
-    for i in CB_G:
-        Pt_CB_Gpos = (Pt_G - i)**2
-        Pt_CB_dis = np.sum(Pt_CB_Gpos, axis=1)
-    # get closest CB's mask
-    s_mask = Pt_CB_dis.index(max(Pt_CB_dis))
-    # pop closest Pt_CB_dis
-    s_dis = math.sqrt(Pt_CB_dis.pop(s_mask))
-    l_mask = Pt_CB_dis.index(max(Pt_CB_dis))
-    l_dis = math.sqrt(Pt_CB_dis.pop(l_mask))
-    c_dis = CB_dis[s_mask][l_mask]
+        Pt.particles["molnum"][ind]=num_mol
+#print(Pt.particles["molnum"])
+flag = Pt.particles['molnum'] == 309
+Pt.trimming_particles(flag)
+#print(Pt.particles['mol'])
+'''
+
+pt_list = [ ind + 1 for ind, m in enumerate(m_list) if len(m) == 309]
+
+Pt_G = np.array([g_c_by_mol(Pt.particles, l) for l in pt_list])
+print("Pt_G")
+print(Pt_G)
+
+#Pt_g = Pt.particles
+#get closest & 2nd closest dis from center
+    #print(i['pos'])
+
+
+"""
+Pt.add_particles_property("close_dis")
+Pt.add_particles_property("close_mask")
+Pt.add_particles_property("2nd_close_dis")
+Pt.add_particles_property("2nd_close_mask")
+"""
+
+Pt_CB_dis = np.array([get_between_dis(i, CB_G) for i in Pt_G])
+print("Pt_CB_dis")
+print(Pt_CB_dis)
+
+#arguments of mask of closest CB from Pt
+#smaskはそれぞれの列の中の最小のインデックスを返した列
+s_mask=np.argmin(Pt_CB_dis, axis = 1)
+Pt_CB_dis_2= np.empty((0,CB_num-1))
+#1次元 s_dis
+s_dis=np.empty((0,1))
+for ind, dis in enumerate(Pt_CB_dis):
+    s_dis = np.append(s_dis, dis[s_mask[ind]])
+    #dis(Pt_CB_dis)のうち，小さいほうs_mask[ind]のものを消す
+    Pt_CB_dis_2 = np.append(Pt_CB_dis_2, [np.delete(dis, s_mask[ind])], axis=0)
+#print(s_dis)
+#print(Pt_CB_dis_2)
+
+if CB_num -1 > 1:
+    l_mask=np.argmin(Pt_CB_dis_2, axis = 1)
+else:
+
+l_dis = np.empty((0,1))
+for ind, dis in enumerate(Pt_CB_dis_2):
+    l_dis = np.append(s_dis, dis[l_mask[ind]], axis=0)
+
+[ math.sqrt(i) for i  in s_dis ]
+[ math.sqrt(j) for j  in l_dis ]
+
+print(l_dis)
+
+'''
+# pop closest Pt_CB_dis
+s_dis = math.sqrt(Pt_CB_dis.pop(s_mask))
+l_mask = Pt_CB_dis.index(max(Pt_CB_dis))
+l_dis = math.sqrt(Pt_CB_dis.pop(l_mask))
+c_dis = CB_dis[s_mask][l_mask]
 
 
 #prove radius
@@ -141,8 +188,4 @@ file.close
 #print(mask - 1, end=' ')
     #[print(co, end=' ') for co in c_out]
     #print(end='\n')
-
-
-
-
 '''
