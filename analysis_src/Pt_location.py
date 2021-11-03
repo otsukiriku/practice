@@ -141,14 +141,19 @@ print(s_dis/(-l_dis**2+s_dis**2+c_dis**2))
 """
 count = []
 [count.append(i) for i in range(0,100,10)]
+print("range freq mask")
 freq = []
+mask = []
 for co in count:
     pr_num=0
-    for r in pr:
+    for idx, r in enumerate(pr):
         if co <= r < co+10:
             pr_num+=1
+            mask.append(Pt_list[idx])
     freq.append(pr_num)
 #print(freq)
+print("Ptmask_list")
+print(mask)
 [print(f'{f}~{f+10} {c}', sep=' ', end="\n" ) for f, c in zip(count, freq)]
 file = open("./Pt_location.txt", mode="w")
 [print(f+10, c, sep=' ', end="\n" ) for f, c in zip(count, freq)]
