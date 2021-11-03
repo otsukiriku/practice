@@ -58,7 +58,7 @@ CB_G = np.empty((0,3))
 for mask in CB_list:
     #for wrap particles
     CB = ss.sdat.particles
-    flag = ((CB['mask']==1) & (CB['pos'][:,2]>750))
+    flag = ((CB['mask']==1) & (CB['pos'][:,2]>dcell*2/3))
     CB['pos'][flag]+=pos_shift
 
     flag = CB["mask"] == mask
@@ -66,13 +66,25 @@ for mask in CB_list:
     CB_G = np.append(CB_G, CB_g, axis=0)
 
 #get each Ptcluster gravity center
-Pt=copy.deepcopy(ss.sdat)
+Pt=ss.sdat
 Pt.create_connect_list(0.3)
 c_list = Pt.connect_list
 m_list = topology.create_molecule(Pt)
-pt_list = [ ind + 1 for ind, m in enumerate(m_list) if len(m) == Pt_cluster_pnum]
+Pt_list = [ ind + 1 for ind, m in enumerate(m_list) if len(m) == Pt_cluster_pnum]
 
-Pt_G = np.array([g_c_by_mol(Pt.particles, l) for l in pt_list])
+Ptmask=Pt.particles['mask'][Pt.particles['type'] == 4]
+Ptmask=np.reshape(Ptmask, (Pt_num, Pt_cluster_pnum))
+#print(Ptmask)
+
+for idx, msk in enumerate(Ptmask):
+    #一列ずつPtmaskから切り取る．
+    msk[:] = Pt_list[idx]
+
+Ptmask = Ptmask.flatten()
+ss.sdat.particles['mask'][Pt.particles['type'] == 4] = Ptmask
+
+
+Pt_G = np.array([g_c_by_mol(Pt.particles, l) for l in Pt_list])
 #print("Pt_G")
 #print(Pt_G)
 
@@ -141,3 +153,5 @@ for co in count:
 file = open("./Pt_location.txt", mode="w")
 [print(f+10, c, sep=' ', end="\n" ) for f, c in zip(count, freq)]
 file.close
+
+ss.output_file("test_input", "input")
