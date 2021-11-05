@@ -37,14 +37,14 @@ Pt_cluster_pnum = 309
 ss=mmps.Stream()
 ss1=mmps.Stream()
 #dim = 3 はxyzの要素数が3つあるので
-ss1.sdat.add_particles_property('id',dim=1)
+ss1.sdat.add_particles_property('id',int,dim=1)
 ss1.sdat.add_particles_property('pos',dim=3)
-ss1.sdat.add_particles_property('type',dim=1)
+ss1.sdat.add_particles_property('type',int,dim=1)
 ss.import_file('ptoncb.rd','input')
-ss.import_file('dump.bond.0','dumpbond')
+#ss.import_file('dump.bond.0','dumpbond')
 
-def g_c_by_mol(atoms : mmps.Stream().sdat.particles, mol):
-    flag = atoms["mol"] == mol
+def g_c_by_mask(atoms : mmps.Stream().sdat.particles, mask):
+    flag = atoms["mask"] == mask
     center = atoms["pos"][flag].mean(axis=0)
     return center
 
@@ -77,22 +77,24 @@ for mask in CB_list:
 #get each Ptcluster gravity center
 Pt=ss.sdat
 Pt.create_connect_list(0.3)
-c_list = Pt.connect_list
-m_list = topology.create_molecule(Pt)
-Pt_list = [ ind + 1 for ind, m in enumerate(m_list) if len(m) == Pt_cluster_pnum]
+#c_list = Pt.connect_list
+#m_list = topology.create_molecule(Pt)
+Pt_list=[i for i in range(7,7+Pt_num)]
+#print(Pt_list)
 Ptmask=Pt.particles['mask'][Pt.particles['type'] == 4]
 Ptmask=np.reshape(Ptmask, (Pt_num, Pt_cluster_pnum))
-#print(Ptmask)
 
 for idx, msk in enumerate(Ptmask):
     #一列ずつPtmaskから切り取る．
     msk[:] = Pt_list[idx]
+#print(Ptmask)
 
 Ptmask = Ptmask.flatten()
 ss.sdat.particles['mask'][Pt.particles['type'] == 4] = Ptmask
 
-
-Pt_G = np.array([g_c_by_mol(Pt.particles, l) for l in Pt_list])
+Pt_list=np.array(Pt_list)
+print(Pt_list)
+Pt_G = np.array([g_c_by_mask(Pt.particles, l) for l in Pt_list])
 #print("Pt_G")
 #print(Pt_G)
 
@@ -143,6 +145,8 @@ print(s_mask)
 #prove radius
 CB_to_Pt_vec=((Pt_G-CB_G[s_mask]))
 pr = s_dis*c_dis**2/(-l_dis**2+s_dis**2+c_dis**2) - s_dis
+correct = np.sum(s_dis)/Pt_num-100
+pr = pr + correct
 #print("prove radius")
 #print(pr)
 
@@ -173,9 +177,9 @@ for co in count:
     for idx, r in enumerate(pr):
         if co <= r < co+10:
             pr_num+=1
-            #mask.append(Pt_list[idx])
-            #pr_list.append(pr[idx])
-            #pr_pos_list.append(pr_pos[idx])
+            mask.append(Pt_list[idx])
+            pr_list.append(pr[idx])
+            pr_pos_list.append(pr_pos[idx])
             #Pt2CBbet.append(Pt_to_CBbet[idx])
             ss1.sdat.particles['id']=np.append(ss1.sdat.particles['id'],idx)
             ss1.sdat.particles['pos']=np.append(ss1.sdat.particles['pos'],[pr_pos[idx]],axis=0)
@@ -186,10 +190,10 @@ print("Ptmask_list")
 print(mask)
 print("pr_radius_list")
 print(pr_list)
-#print("pr_pos_list")
-#[print(i) for i in pr_pos_list]
-print("Pt to CB between pos")
-[print(i) for i in Pt2CBbet]
+print("pr_pos_list")
+[print(i) for i in pr_pos_list]
+#print("Pt to CB between pos")
+#[print(i) for i in Pt2CBbet]
 print("prove_radius_range freq")
 [print(f'{f}~{f+10} {c}', sep=' ', end="\n" ) for f, c in zip(count, freq)]
 
