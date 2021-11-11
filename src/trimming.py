@@ -8,11 +8,18 @@ import sys
 import copy
 
 
-
 ss = mmps.Stream()
-#ifn = sys.args[1]
+ifn = sys.argv[1]
+ss.import_file(ifn, 'input')
+print(f"Read input file {ifn}")
 ss.import_file("dump.pos.0", 'dumppos')
+print(f"Read dump file ")
+
+ss.sdat.wrap_particles()
+ss.sdat.shift_particles()
+
 ss.import_file("dump.bond.0", 'dumpbond')
+print(f"Read bond file ")
 
 ss.sdat.create_connect_list(0.3)
 
