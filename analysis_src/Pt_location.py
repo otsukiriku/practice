@@ -30,9 +30,12 @@ import numpy as np
 import sys
 import copy
 import math
+#************************************
 CB_num = 4
 Pt_num = 56
 Pt_cluster_pnum = 309
+Pt_mask_start = 7
+#************************************
 
 ss=mmps.Stream()
 ss1=mmps.Stream()
@@ -40,7 +43,8 @@ ss1=mmps.Stream()
 ss1.sdat.add_particles_property('id',int,dim=1)
 ss1.sdat.add_particles_property('pos',dim=3)
 ss1.sdat.add_particles_property('type',int,dim=1)
-ss.import_file('ptoncb.rd','input')
+#ss.import_file('ptoncb.rd','input')
+ss.import_file('newinput','input')
 #ss.import_file('dump.bond.0','dumpbond')
 
 def g_c_by_mask(atoms : mmps.Stream().sdat.particles, mask):
@@ -73,38 +77,29 @@ for mask in CB_list:
     #print(flag) 
     CB_g = [CB["pos"][flag].mean(axis=0)]
     CB_G = np.append(CB_G, CB_g, axis=0)
-a=CB_num-1
+#print("CB_G")
+#print(CB_G)
 bottom = CB_G[CB_num-1,] - np.array(pos_shift)
 CB_G = np.append(CB_G, bottom)
 top = CB_G[0,] + np.array(pos_shift)
 CB_G = np.append(CB_G, top)
 CB_G = np.reshape(CB_G,(CB_num+2,3))
-#print("CB_G")
-#print(CB_G)
 
 #get each Ptcluster gravity center
 Pt=ss.sdat
-#Pt.create_connect_list(0.3)
-#c_list = Pt.connect_list
-#m_list = topology.create_molecule(Pt)
-Pt_list=[i for i in range(7,7+Pt_num)]
-#print(Pt_list)
+Pt_list=[i for i in range(Pt_mask_start,Pt_mask_start+Pt_num)]
 Ptmask=Pt.particles['mask'][Pt.particles['type'] == 4]
-Ptmask=np.reshape(Ptmask, (Pt_num, Pt_cluster_pnum))
+Ptmask_2d=np.reshape(Ptmask, (Pt_num, Pt_cluster_pnum))
 
-for idx, msk in enumerate(Ptmask):
+for idx, msk in enumerate(Ptmask_2d):
     #一列ずつPtmaskから切り取る．
     msk[:] = Pt_list[idx]
 #print(Ptmask)
 
-Ptmask = Ptmask.flatten()
 ss.sdat.particles['mask'][Pt.particles['type'] == 4] = Ptmask
 
 Pt_list=np.array(Pt_list)
-#print(Pt_list)
 Pt_G = np.array([g_c_by_mask(Pt.particles, l) for l in Pt_list])
-#print("Pt_G")
-#print(Pt_G)
 
 #get closest & 2nd closest dis from center
 # original
@@ -112,11 +107,9 @@ Pt_G = np.array([g_c_by_mask(Pt.particles, l) for l in Pt_list])
 m_l1 = [i+1 for i in range(0,CB_num+2)]
 mask_l = [m_l1 for j in range(Pt_num)]
 Pt_CB_dis=np.array([get_between_dis(j, CB_G) for j in Pt_G])
-#print("Pt_CB_dis")
-#print(Pt_CB_dis)
 #arguments of mask of closest CB from Pt
 sort = np.sort(Pt_CB_dis, axis=1)
-print(sort)
+#print(sort)
 s_mask=np.empty((0,1), dtype=int)
 s_dis=np.empty((0,1))
 l_mask=np.empty((0,1),dtype=int)
@@ -129,7 +122,7 @@ for idx, arg in enumerate(sort):
     s_dis = np.append(s_dis,Pt_CB_dis[idx,s_mask_idx])
     s_mask = np.append(s_mask, s_mask_idx)
     #二番目に距離が短いmaskとかを取り出す．
-    l_mask_idx = np.where(Pt_CB_dis[idx,:]==arg[1])
+    l_mask_idx = np.where(Pt_CB_dis[idx,:]==arg[1])[0][0]
     l_dis = np.append(l_dis,Pt_CB_dis[idx,l_mask_idx])
     l_mask = np.append(l_mask, l_mask_idx)
     #近い二つCBの中心間距離c_dis
@@ -144,28 +137,17 @@ c_dis = np.sum(dis,axis = 1)
 s_dis=np.sqrt(s_dis)
 l_dis=np.sqrt(l_dis)
 c_dis=np.sqrt(c_dis)
-#print("s_mask")
-#print(s_mask)
-#print("l_mask")
-#print(l_mask)
-#print("s_dis")
-#print(s_dis)
-#print("l_dis")
-#print(l_dis)
-#print("c_dis")
-#print(c_dis)
 
 #prove radius
 CB_to_Pt_vec=((Pt_G-CB_G[s_mask,:]))
 #print(CB_to_Pt_vec)
 pr = s_dis*c_dis**2/(-l_dis**2+s_dis**2+c_dis**2) - s_dis
-#print("prove radius")
-#print(pr)
 
 #get prove center(for test)
-scalor=(s_dis+pr)/s_dis
+scalor=(s_dis+abs(pr))/s_dis
 scalor=np.reshape(scalor, (Pt_num,1))
 correct = np.sum(s_dis)/Pt_num-100
+#print(correct)
 pr = pr + correct
 pr_pos = CB_G[s_mask,:] + CB_to_Pt_vec*(scalor)
 #print(CB_G[s_mask])
@@ -180,7 +162,7 @@ print("s_dis/(-l_dis**2+s_dis**2+c_dis**2)")
 print(s_dis/(-l_dis**2+s_dis**2+c_dis**2))
 """
 count = []
-[count.append(i) for i in range(0,100,10)]
+[count.append(i) for i in range(0,100,1)]
 freq = []
 mask = []
 Pt2CBbet = []
@@ -190,38 +172,50 @@ pr_pos_list = []
 for co in count:
     pr_num=0
     for idx, r in enumerate(pr):
-        if co <= r < co+10:
+        if co <= r < co+1:
             pr_num+=1
             mask.append(Pt_list[idx])
             pr_list.append(pr[idx])
             pr_pos_list.append(pr_pos[idx])
             Pt2CBbet.append(Pt_to_CBbet[idx])
             ss1.sdat.particles['id']=np.append(ss1.sdat.particles['id'],idx)
-            ss1.sdat.particles['pos']=np.append(ss1.sdat.particles['pos'],[pr_pos[idx]],axis=0)
+            ss1.sdat.particles['pos']=np.append(ss1.sdat.particles['pos'],[pr_pos[idx,:]],axis=0)
             ss1.sdat.particles['type']=np.append(ss1.sdat.particles['type'],Pt_list[idx])
     freq.append(pr_num)
 #print(freq)
 
-print("Ptmask_list")
-print(mask)
-print("pr_radius_list")
-print(pr_list)
-print("pr_pos_list")
-[print(i) for i in pr_pos_list]
-print("Pt to CB between pos")
-[print(i) for i in Pt2CBbet]
-print("prove_radius_range freq")
-[print(f'{f}~{f+10} {c}', sep=' ', end="\n" ) for f, c in zip(count, freq)]
-
-#print(ss.sdat.particles['pos'])
+print("Ptmask_list pr_radius_list(angstrom)")
+[print("{} {:.5}".format(m,p)) for m,p in zip(mask,pr_list)]
+#print("pr_pos_list")
+#[print(i, sep = ",") for i in pr_pos_list]
+#print("Pt to CB between pos")
+#[print(i*0.05) for i in Pt2CBbet]
+#print("prove_radius_range freq")
+#[print(f'{f}~{f+10} {c}', sep=' ', end="\n" ) for f, c in zip(count, freq)]
 
 
+"""
+# over write velosity & mask for thermofree
+for idx, p_lis in enumerate(Pt_list): 
+    flag = (ss.sdat.particles['type'] == 4) & (ss.sdat.particles['mask']==p_lis)  
+    #print(flag)
+    ss.sdat.particles['velo'][flag] = -(CB_to_Pt_vec[idx,:])/50000
+
+ss.sdat.particles['mask'][ss.sdat.particles['type']==4] =  10
+ss.sdat.wrap_particles()
+ss.output_file('complete_input', 'input')
+"""
+
+"""
 #debug show probe radius
+ss.sdat.wrap_particles()
+ss.output_file('test_input', 'input')
 ss.sdat.concate_particles(ss1.sdat.particles)
-#ss.output_file('test_input', 'input')
 ss.sdat.add_particles_property("mol", int, 1)
 ss.sdat.particles["mol"][ss.sdat.particles["type"]==4] = Ptmask
-ss.output_file('probe_dump', 'dumppos',['id', 'type', 'pos','mol'])
+ss.output_file('probe_shift_dump', 'dumppos',['id', 'type', 'pos','mol'])
+#ss.output_file('probe_dump', 'dumppos',['id', 'type', 'pos',])
+"""
 
 
 """

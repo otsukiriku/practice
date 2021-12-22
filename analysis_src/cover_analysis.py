@@ -5,6 +5,7 @@ from E_T.func import read_center as rc
 import numpy as np
 import sys
 import copy
+import math
 sys.path.append("/nfshome12/rotsuki/molcop/src/")
 #print(sys.path)
 import modeling.unwrap_particles as u_p
@@ -13,7 +14,7 @@ import evaluate_structure.get_center as g_c
 Pt_cluster_num=326
 Pt_num=14
 #cut off distance from Pt surface
-cutoff = 9
+cutoff = 3.5
 target = 5
 # 5:SofNafion 6:FofNadion
 
@@ -68,21 +69,33 @@ ss.sdat.trimming_particles(taeget_flag)
 target = ss.sdat
 
 count=[]
+cover=[0 for _ in Pt_mol]
+print(cover)
 for p_mol in Pt_mol:
     pt_pos = Pt.particles['pos'][Pt.particles['mol'] == p_mol]
     distflag = np.zeros_like(target.particles['id'], dtype=np.bool)
     for p in pt_pos:
         dist = (target.particles['pos'] - p)**2
         dist = np.sum(dist, axis=1)
+        #[print(math.sqrt(d)) for d in dist if d < cutoff**2]
         flag = dist < (cutoff**2)
+        sumflag = np.sum(flag)
+        coverflag=0
+        if sumflag != 0:
+            coverflag = 1
+        cover[p_mol-1]+=coverflag
         distflag += flag
     temp=np.sum(distflag)
     temp.tolist()
     count.append(temp)
 
-print('Pt_mol_ID Number_of_target_atom')
+print('Pt_mol_ID Number_of_target_atom coverage(%)')
+idx = 0
+
 for idx, c in enumerate(count):
-    print(idx+1, c)
+    total_Pt = len(Pt.particles['id'][Pt.particles['mol']==idx+1])
+    #covered_Pt = np.sum(Pt.particles['flag'][Pt.particles['mol']==idx+1])
+    print("{} {} {:.3}%".format(idx+1, c, cover[idx]/total_Pt*100))
 
 
 #for pt_pos in 
