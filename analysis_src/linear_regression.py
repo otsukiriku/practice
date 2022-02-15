@@ -37,7 +37,7 @@ def plot_scatter(xdata:list, ydata:list, _figname = "test", xlabel='x', ylabel='
     ax.set_ylabel("Coverage(%)", size = 16,)
     ax.tick_params(axis='x', labelsize=16)
     ax.tick_params(axis='y', labelsize=16)
-    ax.set_xlim(5,55)
+    ax.set_xlim(5,45)
     ax.set_ylim(0,80)
     #plt.figure(figsize=(4,3))
     print("xdata dimension")
@@ -68,7 +68,7 @@ def plot_scatter(xdata:list, ydata:list, _figname = "test", xlabel='x', ylabel='
 def main(ss:mmps.Stream()):
     CB_center = rc.r_c("./center.txt")
 
-    mask, prove = Pt_location.Pt_location(ss.sdat, nonzero_option=False, prove_range = 50)
+    mask, prove = Pt_location.Pt_location(ss.sdat, nonzero_option=False, prove_range = 40)
 
     ss.sdat.create_connect_list(0.3)
     connect_list = ss.sdat.connect_list
@@ -104,14 +104,16 @@ def main(ss:mmps.Stream()):
     #print(cover)
     print('Pt_mask Prove Number_of_target_atom coverage(%)')
 
+    coverage_arr =[]
     for idx, c in enumerate(count):
         total_Pt = len(Pt.particles['id'][Pt.particles['mask']==idx+Pt_mask_start])
+        coverage = cover[idx]/total_Pt*100
         #covered_Pt = np.sum(Pt.particles['flag'][Pt.particles['mol']==idx+1])
-        print("{} {:.3} {} {:.3}%".format(idx+Pt_mask_start, prove[idx], c, cover[idx]/total_Pt*100))
-    coverage = [i/total_Pt*100 for i in cover]
+        print("{} {:.3} {} {:.3}%".format(idx+Pt_mask_start, prove[idx], c, coverage))
+        coverage_arr.append(coverage)
     non0coverage = []
     non0prove = []
-    for cov,prov in zip(coverage,prove):
+    for cov,prov in zip(coverage_arr,prove):
         if prov != 0.0:
             non0coverage.append(cov)
             non0prove.append(prov)

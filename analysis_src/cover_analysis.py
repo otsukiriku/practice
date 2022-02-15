@@ -15,7 +15,7 @@ Pt_cluster_num=326
 Pt_num=14
 #cut off distance from Pt surface
 cutoff = 3.5
-target = 5
+target_type = 5
 # 5:SofNafion 6:FofNadion
 
 CB_center = rc.r_c("new_center.txt")
@@ -62,8 +62,7 @@ m_list = topology.create_molecule(Pt)
 Pt_mol=list(set(Pt.particles['mol']))
 #Ptはこれで表面だけ残った．
 #trim only target particle
-taeget_flag = ss.sdat.particles['type'] == target
-#F_flag = ss.sdat.particles['type'] == 6
+taeget_flag = ss.sdat.particles['type'] == target_type
 ss.sdat.trimming_particles(taeget_flag)
 
 target = ss.sdat
