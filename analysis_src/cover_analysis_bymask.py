@@ -16,7 +16,7 @@ Pt_cluster_num=309
 Pt_num=56
 Pt_mask_start = 7
 #cut off distance from Pt surface
-cutoff = 9
+#cutoff = 9
 target_type = 6
 # 5:SofNafion 6:FofNadion
 
@@ -39,7 +39,7 @@ def get_coordination(atoms: mmps.Stream().sdat):
     coordination_num = np.array(coordination_num)
     return coordination_num
 
-def calc_coverage(tar:mmps.Stream(), atoms:mmps.Stream().sdat, conditions=[]):
+def calc_coverage(tar:mmps.Stream(), atoms:mmps.Stream().sdat, conditions=[],cutoff=9):
     count=[]
     cover=[0 for _ in conditions]
     for idx,condtion in enumerate(conditions):
