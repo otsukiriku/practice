@@ -13,12 +13,14 @@ sys.path.append("/nfshome12/rotsuki/molcop/src/")
 import evaluate_structure.get_center as gc
 
 #************************************
-radii = 94
-ptnum = 57
+CB_radii = 75
+radii = CB_radii + 14
+ptnum = 110
 pt_clust_num = 309
 cutoff = 60
 Pt_mask_start = 11
-pr_tar = [10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,44,48,52]
+#probe tar > 15
+pr_tar = [15,15.5,16,16.5,17,17.5,18,18.5,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,56,58,60,62]
 #pr_tar = [20,30,38,52]
 #************************************
 
@@ -104,40 +106,50 @@ def replicate_center_xyz(center:np.array,cell):
     return rep_center
 """
 
-def check_dist_bet_Pt(Pt:mmps.Stream().sdat, Pt_mask):
+def check_dist_bet_Pt(atoms:mmps.Stream().sdat, Pt_mask):
     flag = True
-    pt_flag = Pt.particles['mask']==Pt_mask
-    center1 = gc.g_c(Pt.particles,pt_flag)
+    pt_flag = atoms.particles['mask']==Pt_mask
+    center1 = gc.g_c(atoms.particles,pt_flag)
     #print(center1)
-    Pt_location.correct_center_bymask(Pt,center1,Pt_mask)
-    center1 = gc.g_c(Pt.particles,pt_flag)
+    Pt_location.correct_center_bymask(atoms,center1,Pt_mask)
+    center1 = gc.g_c(atoms.particles,pt_flag)
 
-    for msk in range(Pt_mask-1,Pt_mask_start,-1):
+    for msk in range(Pt_mask-1,Pt_mask_start-1,-1):
         #print(msk)
-        fl = Pt.particles['mask']==msk
-        center2=gc.g_c(Pt.particles,fl)
+        fl = atoms.particles['mask']==msk
+        center2=gc.g_c(atoms.particles,fl)
         dist = (center2 - center1)**2
-        distarr = np.sqrt(np.sum(dist,axis=1))
+        distarr = np.sum(dist,axis=1)
         #print(distarr)
-        if distarr < cutoff :
+        if distarr < cutoff**2 :
             flag = False
             break
     return flag
 
-def check_dist_bet_Pt2CB(Pt:mmps.Stream().sdat, Pt_mask, center):
+def check_dist_bet_Pt2CB(atoms:mmps.Stream().sdat, Pt_mask, center):
     flag = True
-    pt_flag = Pt.particles['mask']==Pt_mask
-    center1 = gc.g_c(Pt.particles,pt_flag)
-    Pt_location.correct_center_bymask(Pt,center1,Pt_mask)
-    center1 = gc.g_c(Pt.particles,pt_flag)
+    pt_flag = atoms.particles['mask']==Pt_mask
+    center1 = gc.g_c(atoms.particles,pt_flag)
+    Pt_location.correct_center_bymask(atoms,center1,Pt_mask)
+    center1 = gc.g_c(atoms.particles,pt_flag)
     #print(center1)
     dist = (center - center1)**2
-    distarr = np.sqrt(np.sum(dist,axis=1))
+    distarr = np.sum(dist,axis=1)
     closest_CB_idx = np.argmin(distarr)
-    if (distarr < radii -2).any():
+    if (distarr < radii**2 - 4).any():
         flag = False
     Pt2CB_vector = center[closest_CB_idx] - center1
-    Pt.particles['velo'][pt_flag] = Pt2CB_vector / 5000
+    atoms.particles['velo'][pt_flag] = Pt2CB_vector / 50000
+    return flag
+
+def check_Pt_G_posit_in_cell(atoms:mmps.Stream().sdat,Pt_mask):
+    flag = True
+    pt_flag = atoms.particles['mask']==Pt_mask
+    center1 = gc.g_c(atoms.particles,pt_flag)
+    Pt_location.correct_center_bymask(atoms,center1,Pt_mask)
+    center1 = gc.g_c(atoms.particles,pt_flag)
+    if (center1 > np.array(atoms.cell) - 10).any() or (center1 < np.array(atoms.dcell) + 10 ).any():
+        flag = False
     return flag
 
 if __name__ == "__main__":
@@ -169,17 +181,17 @@ if __name__ == "__main__":
     pr_flag = [False for _ in range(ptnum)]
     Pt_dist_flag = [False for _ in range(ptnum)]
     Pt2CB_dist_flag = [False for _ in range(ptnum)]
+    Pt_G_flag = [False for _ in range(ptnum)]
 
     while not end_flag:
         for idx,msk in enumerate(range(Pt_mask_start, Pt_mask_start+ptnum)):
             #print(msk)
-            if pr_flag[idx] and Pt_dist_flag[idx] and Pt2CB_dist_flag[idx]:
+            if pr_flag[idx] and Pt_dist_flag[idx] and Pt2CB_dist_flag[idx] and Pt_G_flag[idx]:
                 continue
             else:
                 arrange_Pt_pos(Pt.sdat,msk,CB_center,theta,phi,Pt_pos)
                 fl = Pt.sdat.particles['mask']==msk
                 pr = Pt_location.Pt_loc_by_pos(Pt.sdat, msk, ptnum,Pt_mask_start=Pt_mask_start)
-                #pr = Pt_location.Pt_location(Pt.sdat,nonzero_option=False, CB_num=10, Pt_num=1,Pt_mask_start=msk)
 
                 if idx < len(pr_tar) :
                     #print(pr_tar[idx])
@@ -204,9 +216,12 @@ if __name__ == "__main__":
                 Pt2CB_dist_flag[idx] = check_dist_bet_Pt2CB(Pt.sdat,msk,rep_CB_center)
                 if not Pt2CB_dist_flag[idx]:
                     break
+                Pt_G_flag[idx] = check_Pt_G_posit_in_cell(Pt.sdat,msk)
+                if not Pt_G_flag[idx]:
+                    break
 
 
-        if all(pr_flag) and all(Pt_dist_flag) and all(Pt2CB_dist_flag):
+        if all(pr_flag) and all(Pt_dist_flag) and all(Pt2CB_dist_flag) and all(Pt_G_flag):
             end_flag = True
 
     ss.sdat.concate_particles(Pt.sdat.particles)
@@ -215,7 +230,7 @@ if __name__ == "__main__":
     Pt_list=[i for i in range(Pt_mask_start,Pt_mask_start+ptnum)]
 
     #Debug to show Probe
-    pr_mask,pr_list,pr_pos = Pt_location.Pt_location(ss.sdat,CB_num=10,Pt_num=ptnum,Pt_mask_start=Pt_mask_start)
+    pr_mask,pr_list,pr_pos = Pt_location.Pt_location(ss.sdat,CB_num=10,Pt_num=ptnum,Pt_mask_start=Pt_mask_start,prove_range=100)
     [print("Ptmask:{}  Probe:{}".format(msk,pr)) for msk,pr in zip(pr_mask,pr_list)]
     pr_type = []
     #for msk in range(Pt_mask_start, Pt_mask_start+ptnum):
@@ -237,9 +252,12 @@ if __name__ == "__main__":
     """
 
     #debug All Pt_mask will be
-    Pt_flag=ss.sdat.particles['mask'] >= Pt_mask_start
-    ss.sdat.particles['mask'][Pt_flag] = 4
-
-    ss.output_file("newinput","input")
+    ss.sdat.wrap_particles()
+    ss.sdat.set_elem_to_type(mmps.get_elem_to_type("para.rd"))
     ss.output_file("show_dump","dumppos",["id","type","pos",'velo',"mask"])
+
+    Pt_flag=ss.sdat.particles['mask'] >= Pt_mask_start
+    ss.sdat.particles['mask'][Pt_flag] = 11
+    ss.sdat.thermofree_info = ['#thermofree 11']
+    ss.output_file("newinput","input")
 

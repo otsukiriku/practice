@@ -26,15 +26,19 @@ rp = (rs * rc^2)/(-rl^2+rs^2+rc^2) -rs
 from MolCop import mmpystream as mmps
 from MolCop.analysis import topology
 #from evalueate_structure import get_center as gc
+from E_T.func import Pt_location
+from E_T.io import read_center as rc
 import numpy as np
 import sys
 import copy
 import math
+
 #************************************
-CB_num = 4
-Pt_num = 56
+CB_num = 10
+CB_radius = 75
+Pt_num = 57
 Pt_cluster_pnum = 309
-Pt_mask_start = 7
+Pt_mask_start = 11
 #************************************
 
 ss=mmps.Stream()
@@ -44,8 +48,13 @@ ss1.sdat.add_particles_property('id',int,dim=1)
 ss1.sdat.add_particles_property('pos',dim=3)
 ss1.sdat.add_particles_property('type',int,dim=1)
 #ss.import_file('ptoncb.rd','input')
-ss.import_file('newinput','input')
+ss.import_file(sys.argv[1],'input')
 #ss.import_file('dump.bond.0','dumpbond')
+
+#mask,prove,pr_pos=Pt_location.Pt_location(ss.sdat,nonzero_option=False,CB_num=CB_num,Pt_num=Pt_num, Pt_mask_start=11,CB_radius=CB_radius)
+
+#print(mask)
+#print(prove)
 
 def g_c_by_mask(atoms : mmps.Stream().sdat.particles, mask):
     flag = atoms["mask"] == mask
@@ -63,27 +72,7 @@ def get_between_dis(atom1, atom2):
 dcell=ss.sdat.cell[2]
 pos_shift = [0, 0, dcell]
 CB_list=[i+1 for i in range(CB_num)]
-CB_G = np.empty((0,3))
-for mask in CB_list:
-    #for wrap particles
-    CB = ss.sdat.particles
-    flag = ((CB['mask']==1) & (CB['pos'][:,2]>dcell*2/3))
-    CB['pos'][flag]-=pos_shift
-    flag = ((CB['mask']==CB_num) & (CB['pos'][:,2]<dcell*1/3))
-    CB['pos'][flag]+=pos_shift
-
-    flag = CB["mask"] == mask
-    #print(CB["mask"]) 
-    #print(flag) 
-    CB_g = [CB["pos"][flag].mean(axis=0)]
-    CB_G = np.append(CB_G, CB_g, axis=0)
-#print("CB_G")
-#print(CB_G)
-bottom = CB_G[CB_num-1,] - np.array(pos_shift)
-CB_G = np.append(CB_G, bottom)
-top = CB_G[0,] + np.array(pos_shift)
-CB_G = np.append(CB_G, top)
-CB_G = np.reshape(CB_G,(CB_num+2,3))
+CB_G = rc.r_c()
 
 #get each Ptcluster gravity center
 Pt=ss.sdat
@@ -146,7 +135,7 @@ pr = s_dis*c_dis**2/(-l_dis**2+s_dis**2+c_dis**2) - s_dis
 #get prove center(for test)
 scalor=(s_dis+abs(pr))/s_dis
 scalor=np.reshape(scalor, (Pt_num,1))
-correct = np.sum(s_dis)/Pt_num-100
+correct = np.sum(s_dis)/Pt_num-CB_radius
 #print(correct)
 pr = pr + correct
 pr_pos = CB_G[s_mask,:] + CB_to_Pt_vec*(scalor)
@@ -217,8 +206,6 @@ ss.output_file('probe_shift_dump', 'dumppos',['id', 'type', 'pos','mol'])
 #ss.output_file('probe_dump', 'dumppos',['id', 'type', 'pos',])
 """
 
-
-"""
 #debug show Pt_G
 for idx, r in enumerate(Pt_G):
     pr_num+=1
@@ -234,4 +221,3 @@ for idx, r in enumerate(Pt_G):
 ss.sdat.concate_particles(ss1.sdat.particles)
 #ss.output_file('test_input', 'input')
 ss.output_file('Pt_G_dump', 'dumppos',['id', 'type', 'pos'])
-"""
