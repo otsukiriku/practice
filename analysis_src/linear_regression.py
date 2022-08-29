@@ -19,7 +19,7 @@ import  cover_analysis_bymask as c_a
 
 #########################################
 Pt_cluster_num=309
-Pt_num=56
+Pt_num=90
 Pt_mask_start = 7
 #cut off distance from Pt surface
 cutoff = 9
@@ -28,7 +28,7 @@ dot_color=["blue","red", "green", "orange","b"]
 line_color=["c","pink","olive","y","b"]
 #########################################
 
-def plot_scatter(xdata:list, ydata:list, _figname = "test", xlabel='x', ylabel='y'):
+def plot_scatter(xdata:np.array, ydata:np.array,rabel=None, _figname = "cutoff10_coverage", xlabel='x', ylabel='y'):
     """datax,y should be 2dimension list"""
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111)
@@ -38,21 +38,28 @@ def plot_scatter(xdata:list, ydata:list, _figname = "test", xlabel='x', ylabel='
     ax.tick_params(axis='x', labelsize=16)
     ax.tick_params(axis='y', labelsize=16)
     ax.set_xlim(5,45)
-    ax.set_ylim(0,80)
+    ax.set_ylim(0,100)
     #plt.figure(figsize=(4,3))
     print("xdata dimension")
     print(len(xdata))
-    if len(xdata) == 1:
-        ax.scatter(xdata,ydata)
+    if xdata.ndim == 1:
+        #xdata = xdata[0]
+        ax.scatter(xdata,ydata,c=dot_color[0])
         test = [[i] for i in xdata]
+        print(test)
         X = np.array(test)
         Y = np.array(ydata)
         Ir = LinearRegression()
         Ir.fit(X,Y)
-        plt.plot(X,Ir.predict(X), color="red")
-        ax.text(0.95,0.05,"coefficient="+str(Ir.coef_), transform=ax.transAxes, horizontalalignment="right")
+        plt.plot(X,Ir.predict(X), color = line_color[0])
+        coef=math.sqrt(Ir.score(X,Y))
+        ax.text(0.95,0.05,"coefficient="+str(round(coef,3)), transform=ax.transAxes, horizontalalignment="right",fontsize=13)
+        if rabel is not None:
+            for i, lab in enumerate(rabel):
+                plt.text(xdata[i],ydata[i],lab)
         fig.savefig(_figname+".png",dpi=250)
         plt.show()
+        print("end")
     else:
         for idx, (x,y) in enumerate(zip(xdata,ydata)):
             ax.scatter(x,y,c=dot_color[idx])
@@ -62,13 +69,18 @@ def plot_scatter(xdata:list, ydata:list, _figname = "test", xlabel='x', ylabel='
             Ir = LinearRegression()
             Ir.fit(X,Y)
             plt.plot(X,Ir.predict(X), color=line_color[idx])
-            ax.text(0.95,0.05+0.05*idx, dot_color[idx]+":coefficient="+str(Ir.coef_), transform=ax.transAxes, horizontalalignment="right")
+            coef=math.sqrt(Ir.score(X,Y))
+            ax.text(0.95,0.05+0.07*idx, dot_color[idx]+":coefficient="+str(round(coef,3)), transform=ax.transAxes, horizontalalignment="right", fontsize=13)
+            if rabel is not None:
+                for i, lab in enumerate(rabel[idx]):
+                    plt.text(x[i],y[i],lab)
         fig.savefig(_figname+".png",dpi=250)
+        print("end")
 
 def main(ss:mmps.Stream()):
     CB_center = rc.r_c("./center.txt")
 
-    mask, prove = Pt_location.Pt_location(ss.sdat, nonzero_option=False, prove_range = 40)
+    mask, prove, pr_pos = Pt_location.Pt_location(ss.sdat, nonzero_option=False, prove_range = 60, CB_num=15, Pt_num=90, Pt_cluster_pnum = 309, CB_radius=75)
 
     ss.sdat.create_connect_list(0.3)
     connect_list = ss.sdat.connect_list
@@ -82,7 +94,7 @@ def main(ss:mmps.Stream()):
 
     #配位数でPtの表面を管理することにした．
     coordination_num = c_a.get_coordination(Pt)
-    distflag = c_a.distance_flag(Pt, CB_center)
+    distflag = c_a.distance_flag(Pt, CB_center,radius=75)
     flag = (coordination_num < 10) & distflag
     Pt.trimming_particles(flag, reindex=True)
     topology.unwrap_molecule(Pt)
@@ -93,11 +105,16 @@ def main(ss:mmps.Stream()):
     target_flag = ss.sdat.particles['type'] == target_type
     ss.sdat.trimming_particles(target_flag)
 
+    # for debug trimmed_Pt
+    ss1 = mmps.Stream()
+    ss1.sdat = Pt
+    ss1.output_file("show_dump", 'dumppos', ["id","type","pos",'mol','mask'] )
+    ss.output_file("trimmed_input", 'input')
     target = ss.sdat
 
     #print(cover)
     Pt_mask = [i for i in range(Pt_mask_start, Pt_mask_start+Pt_num)]
-    count, cover = c_a.calc_coverage(target, Pt, Pt_mask)
+    count, cover = c_a.calc_coverage(target, Pt, Pt_mask,cutoff)
     #print("count")
     #print(count)
     #print("cover")
@@ -107,55 +124,48 @@ def main(ss:mmps.Stream()):
     coverage_arr =[]
     for idx, c in enumerate(count):
         total_Pt = len(Pt.particles['id'][Pt.particles['mask']==idx+Pt_mask_start])
+        print(idx+Pt_mask_start, total_Pt)
         coverage = cover[idx]/total_Pt*100
         #covered_Pt = np.sum(Pt.particles['flag'][Pt.particles['mol']==idx+1])
         print("{} {:.3} {} {:.3}%".format(idx+Pt_mask_start, prove[idx], c, coverage))
         coverage_arr.append(coverage)
     non0coverage = []
     non0prove = []
-    for cov,prov in zip(coverage_arr,prove):
+    non0mask =[]
+    for cov,prov,msk in zip(coverage_arr,prove,mask):
         if prov != 0.0:
             non0coverage.append(cov)
             non0prove.append(prov)
+            non0mask.append(msk)
     #print(non0prove)
-    return non0coverage,non0prove
+    return non0coverage,non0prove,non0mask
 
-    """
-    # for debug trimmed_Pt
-    ss1 = mmps.Stream()
-    ss1.sdat = Pt
-    ss1.output_file("show_dump", 'dumppos', ["id","type","pos",'mol','mask'] )
-    ss.output_file("trimmed_input", 'input')
-    """
 
 if __name__ == "__main__":
-    #for pandas
-    #data_num=int(len(sys.argv)/2)
-    #colum_rabel=[ "data"+str(i) for i in range(0,data_num)]
-
     ss = mmps.Stream()
     ss.import_file(sys.argv[1], 'dumppos')
     ss.import_file(sys.argv[2], 'dumpbond')
-    ss_coverage, ss_prove=main(ss)
-    #ss_coverage = np.array([ss_coverage])
-    #ss_prove = np.array([ss_prove])
+    ss_coverage, ss_prove, ss_mask=main(ss)
+    # FOR more than two samples
+    #ss_coverage = [ss_coverage]
+    #ss_prove = [ss_prove]
+    #ss_mask = [ss_mask]
+    if len(sys.argv) > 3:
+        ss1 = mmps.Stream()
+        ss1.import_file(sys.argv[3], 'dumppos')
+        ss1.import_file(sys.argv[4], 'dumpbond')
+        ss1_coverage, ss1_prove,ss1_mask= main(ss1)
+        #ss_coverage.append(ss1_coverage)
+        #ss_prove.append(ss1_prove)
+        #ss_mask.append(ss1_mask)
+        ss_coverage.extend(ss1_coverage)
+        ss_prove.extend(ss1_prove)
+        ss_mask.extend(ss1_mask)
     print("ss_coverage")
+    print(ss_prove)
     print(ss_coverage)
-    ss1 = mmps.Stream()
-    ss1.import_file(sys.argv[3], 'dumppos')
-    ss1.import_file(sys.argv[4], 'dumpbond')
-    ss1_coverage, ss1_prove = main(ss1)
-    print("ss1_coverage")
-    print(ss1_coverage)
-    ss_coverage=[ss_coverage]
-    ss_coverage.append(ss1_coverage)
-    ss_prove=[ss_prove]
-    ss_prove.append(ss1_prove)
-    #ss_coverage=np.append(ss_coverage,np.array([ss1_coverage]),axis=0)
-    #ss_prove=np.append(ss_prove,np.array([ss1_prove]),axis=0)
-    print("ss_coverage")
-    print(ss_coverage)
-    #print("ss_prove")
-    #print(ss_prove)
-    plot_scatter(ss_prove, ss_coverage)
+    #plot_scatter(ss_prove, ss_coverage,_figname="cutoff9_coverage")
+    plot_scatter(np.array(ss_prove), ss_coverage,_figname="cutoff9_coverage")
+    #plot_scatter(np.array(ss_prove), ss_coverage,ss_mask,_figname="cutoff9_coverage_withtitle")
+
 

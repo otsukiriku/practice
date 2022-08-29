@@ -4,6 +4,7 @@ import sys
 import math
 import copy
 from E_T.io import read_center as rc
+from E_T.func import get_center as gc
 ss = mmps.Stream()
 flag_decomp = False
 grid = np.zeros(3,dtype=int) #何回も利用する
@@ -13,7 +14,7 @@ totalgrid = 1
 global grid_len
 grid_len = 3
 global CB_radii
-CB_radii = 100
+CB_radii = 75
 #*********************************************
 
 def get_local_atoms(data : mmps.Stream().sdat):
@@ -32,7 +33,8 @@ def get_local_atoms(data : mmps.Stream().sdat):
     return localatoms
 
 def inside_center(data:mmps.Stream().sdat,localatoms,CB_radius):
-    CB_center = rc.r_c()
+    #CB_center = rc.r_c()
+    CB_center = gc.get_CB_G(ss.sdat,15,False)
     cell = np.array(data.cell)
     dcell =  np.array(data.dcell)
     for center in CB_center:
@@ -80,6 +82,13 @@ def output_porosity(localatoms):
     print("Filledgrid:{}".format(filledgrid))
     print("Porosity:{}".format(porosity))
 
+def output_3D_tortuosity(localatoms):
+    filledgrid = np.count_nonzero(localatoms)
+    porosity = (totalgrid-filledgrid)/totalgrid
+    tortuosity_3D = porosity**(-0.5)
+    print("Tortuosity_3D:{}".format(tortuosity_3D))
+
+
 def debug_show(data:mmps.Stream().sdat,localatoms):
     debug = mmps.Stream()
     debug.sdat.cell = ss.sdat.cell
@@ -109,12 +118,14 @@ def debug_show(data:mmps.Stream().sdat,localatoms):
     if "type" not in debug.sdat.particles:
         debug.sdat.add_particles_property("type", _dtype=int)
     debug.sdat.particles['type']=np.array([10 for _ in range(total_particle)])
+    
     debug.output_file("debug_show",'dumppos',['id','type','pos'])
 
 if __name__ == '__main__':
     args = sys.argv
     inputfile = args[1]
-    ss.import_file(inputfile, 'input')
+    #ss.import_file(inputfile, 'input')
+    ss.import_file(inputfile, 'dumppos')
     print("# Success : file import has completed !") #ファイル読み込み完了
     print("calculating now ...")
     set_grid(ss.sdat,grid_len)
@@ -122,7 +133,7 @@ if __name__ == '__main__':
     #output_porosity(latoms)
     latoms = inside_center(ss.sdat,latoms, CB_radii)
     output_porosity(latoms)
-
+    output_3D_tortuosity(latoms)
     #debug
     debug_show(ss.sdat,latoms)
 

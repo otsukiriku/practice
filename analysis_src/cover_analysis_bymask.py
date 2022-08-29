@@ -20,14 +20,14 @@ Pt_mask_start = 7
 target_type = 6
 # 5:SofNafion 6:FofNadion
 
-def distance_flag(atoms: mmps.Stream().sdat, center=[]):
+def distance_flag(atoms: mmps.Stream().sdat, center=[],radius=100):
     distflag = np.zeros_like(atoms.particles['id'], dtype=np.bool)
     #print(distflag)
     for cent in center:
         dist = (atoms.particles['pos'] - cent)**2
         dist = np.sum(dist, axis=1)
         #print(*dist)
-        distarr = dist < 10800 
+        distarr = dist < radius**2
         distflag += distarr
     #flag反転し，中心から一定以上離れたものを残す．
     distflag = np.logical_not(distflag)
