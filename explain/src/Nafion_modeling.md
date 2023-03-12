@@ -1,0 +1,9 @@
+# Nafion_modeling
+
+nafionを炭素担体のモデルに被覆する際に使用する．
+
+pack_insidewaterで炭素担体の表面に水を配置する．
+
+unwrap_particlesでバルクのナフィオンをcombineできる常態に持っていく．
+
+combinexyは4粒子と15粒子のモデリングで用いた．z方向は周期境界を考慮して配置する．
